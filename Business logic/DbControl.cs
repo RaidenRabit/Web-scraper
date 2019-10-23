@@ -1,4 +1,5 @@
 ﻿using Business_logic.Models;
+using System;
 using System.Data;
 using System.Data.SqlClient;
 namespace Business_logic
@@ -45,6 +46,11 @@ namespace Business_logic
                 }
                 return "";
             }
+        }
+
+        public void InsertNotSupported(string v)
+        {
+
         }
 
         public string InsertDelivery(DeliveryDays delivery, string zipCode)

@@ -9,6 +9,20 @@ namespace TUI
     {
         static void Main(string[] args)
         {
+            try
+            {
+                StartProgram();
+                Console.Beep();
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+        }
+
+        private static void StartProgram()
+        {
+
             List<List<DeliveryDays>> allZipDeliveries = new List<List<DeliveryDays>>();
             List<string> zipCodes;
             Scraper scraper = new Scraper();
@@ -21,18 +35,26 @@ namespace TUI
 
             Console.WriteLine("Getting data for each zip code");
 
-            for(int i = 0; i < zipCodes.Count - 1; i++)
+            for (int i = 0; i < zipCodes.Count - 1; i++)
             {
                 DrawTextProgressBar(i, zipCodes.Count);
-                var deliveries = scraper.GetCleanData(zipCodes[i]);
-                allZipDeliveries.Add(deliveries);
-                foreach (DeliveryDays d in deliveries)
+                var deliveries = scraper.GetCleanData(zipCodes[i]); // possible to send month and year as well
+                if (deliveries != null)
                 {
-                    string deliveryId = dbControl.InsertDelivery(d, zipCodes[i]);
-                    foreach(Slot s in d.slots)
+                    allZipDeliveries.Add(deliveries);
+                    foreach (DeliveryDays d in deliveries)
                     {
-                        dbControl.InsertSlot(s, deliveryId);
+                        string deliveryId = dbControl.InsertDelivery(d, zipCodes[i]);
+                        foreach (Slot s in d.slots)
+                        {
+                            dbControl.InsertSlot(s, deliveryId);
+                        }
                     }
+                }
+                else
+                {
+                    dbControl.InsertNotSupported(zipCodes[i]);
+                    Console.WriteLine(zipCodes[i] + "NOT SUPPORTED");
                 }
             }
 

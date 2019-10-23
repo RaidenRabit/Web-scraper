@@ -20,15 +20,19 @@ namespace Business_logic
 
             JObject jo = JObject.Parse(originalData);
             var header = jo.SelectToken("model.days");
-            var deliveryDays = header.ToObject<List<DeliveryDays>>();
-            deliveryDays.RemoveAll(x => x.slots == null);
-            deliveryDays.RemoveAll(x => x.slots.Count < 1);
-            foreach(var i in deliveryDays)
+            if (header != null)
             {
-                i.zipCode = postalCode;
-            }
+                var deliveryDays = header.ToObject<List<DeliveryDays>>();
+                deliveryDays.RemoveAll(x => x.slots == null);
+                deliveryDays.RemoveAll(x => x.slots.Count < 1);
+                foreach (var i in deliveryDays)
+                {
+                    i.zipCode = postalCode;
+                }
 
-            return deliveryDays;
+                return deliveryDays;
+            }
+            return null;
         }
 
         public List<string> GetZipCodes()

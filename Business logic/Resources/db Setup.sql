@@ -9,7 +9,8 @@ go
 
 create table ZipCodes(
 	ZipCode int Primary key,
-	City varchar(max)
+	City varchar(max),
+	SupportedByCoop bit DEFAULT 0
 );
 
 create table DeliveryDays(
@@ -49,8 +50,9 @@ create table DeliveriesToSlots(
 	deliveryId int Foreign key references DeliveryDays(deliveryId),
 	slotId int FOREIGN KEY REFERENCES Slots(slotId)
 );
-
 go
+
+-- stored procedures
 
 DROP PROCEDURE IF EXISTS AddDelivery
 GO
@@ -66,19 +68,35 @@ BEGIN
 		BEGIN
 			SET @asdf = (SELECT deliveryId FROM DeliveryDays WHERE mobileText = @mobileText AND date = @date AND text = @text AND active = @active
 	AND inMonth = @inMonth AND cheapestAmount = @cheapestAmount)
+	IF EXISTS(SELECT * FROM ZipCodesToDeliveries WHERE DeliveryId = @asdf AND ZipCode = @zipCode)
+			BEGIN
+			ROLLBACK
+			SELECT 0 as deliveryId
+			END
+		ELSE
+			BEGIN
 			INSERT INTO ZipCodesToDeliveries (DeliveryId, ZipCode) VALUES (@asdf, @zipCode);
-		COMMIT
-		SELECT @asdf as deliveryId
+			COMMIT
+			SELECT @asdf as deliveryId
+			END
 		END
 	ELSE
 		BEGIN
-			DECLARE @newId int;
-			INSERT INTO DeliveryDays(active, cheapestAmount, date, inMonth, mobileText, text)
-			VALUES (@active, @cheapestAmount, @date, @inMonth, @mobileText, @text);
-			SET @newId = SCOPE_IDENTITY()
+		DECLARE @newId int;
+		INSERT INTO DeliveryDays(active, cheapestAmount, date, inMonth, mobileText, text)
+		VALUES (@active, @cheapestAmount, @date, @inMonth, @mobileText, @text);
+		SET @newId = SCOPE_IDENTITY()
+		IF EXISTS(SELECT * FROM ZipCodesToDeliveries WHERE DeliveryId = @newId AND ZipCode = @zipCode)
+			BEGIN
+			ROLLBACK
+			SELECT 0 as deliveryId
+			END
+		ELSE
+			BEGIN
 			INSERT INTO ZipCodesToDeliveries (DeliveryId, ZipCode) VALUES (@newId, @zipCode);
 			COMMIT
-		SELECT @newId as deliveryId
+			SELECT @newId as deliveryId
+			END
 		END
 END
 GO
@@ -103,23 +121,55 @@ BEGIN
 											text = @text AND isMealKitEligible = @isMealKitEligible AND amountMinor = @amountMinor AND
 											amount = @amount AND amountText = @amountText AND mobileAmountText = @mobileAmountText AND
 											soldOut = @soldOut AND isDiscounted = @isDiscounted AND isAlternativeDeadline = @isAlternativeDeadline);
+		IF EXISTS(SELECT * FROM DeliveriesToSlots WHERE deliveryId = @deliveryId AND slotId = @asdf)
+			BEGIN
+			ROLLBACK
+			SELECT 0 as slotId
+			END
+		ELSE
+			BEGIN
 			INSERT INTO DeliveriesToSlots(deliveryId, slotId) VALUES (@deliveryId, @asdf);
-		COMMIT
-		SELECT @asdf as slotId
+			COMMIT
+			SELECT @asdf as slotId
+			END
 		END
 	ELSE
 		BEGIN
-			DECLARE @newId INT;
-			INSERT INTO Slots(text, soldOut, mobileAmountText, isMealKitEligible, isFlexDelivery, isDiscounted, isDeliverable, isAlternativeDeadline,
-			fromHour, dlvModeId, amountText, amountMinor, amount)
-			VALUES (@text, @soldOut, @mobileAmountText, @isMealKitEligible, @isFlexDelivery, @isDiscounted, @isDeliverable, @isAlternativeDeadline,
-			@fromHour, @dlvModeId, @amountText, @amountMinor, @amount);
-			SET @newId = SCOPE_IDENTITY()
+		DECLARE @newId INT;
+		INSERT INTO Slots(text, soldOut, mobileAmountText, isMealKitEligible, isFlexDelivery, isDiscounted, isDeliverable, isAlternativeDeadline,
+		fromHour, dlvModeId, amountText, amountMinor, amount)
+		VALUES (@text, @soldOut, @mobileAmountText, @isMealKitEligible, @isFlexDelivery, @isDiscounted, @isDeliverable, @isAlternativeDeadline,
+		@fromHour, @dlvModeId, @amountText, @amountMinor, @amount);
+		SET @newId = SCOPE_IDENTITY()
+		IF EXISTS(SELECT * FROM DeliveriesToSlots WHERE deliveryId = @deliveryId AND slotId = @newId)
+			BEGIN
+			ROLLBACK
+			SELECT 0 as slotId
+			END
+		ELSE
+			BEGIN
 			INSERT INTO DeliveriesToSlots(deliveryId, slotId) VALUES (@deliveryId, @newId);
 			COMMIT
-		SELECT @newId as slotId
+			SELECT @newId as slotId
+			END
 		END
 END
+GO
+
+-- trigger
+
+CREATE OR ALTER TRIGGER SupportedByCoop
+ON ZipCodesToDeliveries
+FOR INSERT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL SERIALIZABLE
+	BEGIN TRANSACTION
+	DECLARE @ZipCode INT;
+	SELECT @ZipCode = ZipCode FROM INSERTED
+	UPDATE ZipCodes SET SupportedByCoop = 1 WHERE ZipCode = @ZipCode
+	COMMIT
+End
 GO
 
 -- seed data for zipcodes
