@@ -2,9 +2,6 @@
 using Business_logic.Models;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace TUI
 {
@@ -15,21 +12,31 @@ namespace TUI
             List<List<DeliveryDays>> allZipDeliveries = new List<List<DeliveryDays>>();
             List<string> zipCodes;
             Scraper scraper = new Scraper();
+            DbControl dbControl = new DbControl();
 
             Console.WriteLine("Reading zip codes");
 
             ExcelReader e = new ExcelReader();
             zipCodes = scraper.GetZipCodes();
 
-            Console.WriteLine("Getting data for each zip code and putting it in a db");
+            Console.WriteLine("Getting data for each zip code");
 
             for(int i = 0; i < zipCodes.Count - 1; i++)
             {
                 DrawTextProgressBar(i, zipCodes.Count);
                 var deliveries = scraper.GetCleanData(zipCodes[i]);
                 allZipDeliveries.Add(deliveries);
-
+                foreach (DeliveryDays d in deliveries)
+                {
+                    string deliveryId = dbControl.InsertDelivery(d, zipCodes[i]);
+                    foreach(Slot s in d.slots)
+                    {
+                        dbControl.InsertSlot(s, deliveryId);
+                    }
+                }
             }
+
+            Console.WriteLine("done");
         }
 
         private static void DrawTextProgressBar(int progress, int total)
